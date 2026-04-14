@@ -1,0 +1,562 @@
+{
+  "name": "CV submission",
+  "nodes": [
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.ocr.space/parse/image",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "K84983012388957"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "multipart-form-data",
+        "bodyParameters": {
+          "parameters": [
+            {
+              "name": "language",
+              "value": "eng"
+            },
+            {
+              "name": "isOverlayRequired",
+              "value": "false"
+            },
+            {
+              "parameterType": "formBinaryData",
+              "name": "file",
+              "inputDataFieldName": "data"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        380,
+        20
+      ],
+      "id": "7f636c4a-4b33-4f54-bec7-010c565e2315",
+      "name": "Parse PDF"
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "2e4f972c-3886-4052-b3bd-e26dd10119fc",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -60,
+        20
+      ],
+      "id": "a79300a6-246d-42c3-8522-0fc5bd506e1c",
+      "name": "Tally Webhook",
+      "webhookId": "2e4f972c-3886-4052-b3bd-e26dd10119fc"
+    },
+    {
+      "parameters": {
+        "url": "={{ $json.body.data.fields[1].value[0].url }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        160,
+        20
+      ],
+      "id": "4606fac5-a58c-4c7f-86b7-294512108156",
+      "name": "Get PDF"
+    },
+    {
+      "parameters": {
+        "jsCode": "const parsedResults = $json[\"ParsedResults\"]; \nlet fullText = \"\";\n\nparsedResults.forEach(result => {\n  fullText += result.ParsedText + \"\\n\";\n});\n\nreturn [{\n  json: {\n    fullCVText: fullText\n  }\n}];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        600,
+        20
+      ],
+      "id": "feca8a5b-dcca-4bb5-9645-1d7a7ead37b1",
+      "name": "Wrap up response"
+    },
+    {
+      "parameters": {
+        "text": "={{ $('Wrap up response').item.json.fullCVText }}",
+        "schemaType": "fromJson",
+        "jsonSchemaExample": "{\n  \"full_name\": \"\",\n  \"years_of_experience\": 0,\n  \"skills\": []\n}",
+        "options": {
+          "systemPromptTemplate": "=You are an expert extraction algorithm.\nOnly extract relevant information from the text below.\n\nYour goal is to return a JSON with the candidate's key data such as email, years of experience, and to **decompose grouped or complex skill phrases into individual skills**.\n\nFor example, if the input contains:  \n\"Custom solutions with JS, HTML, CSS and SQL (Dart for Flutterflow)\",  \nyou must extract each skill separately in the `skills` array, like:  \n[\"JavaScript\", \"HTML\", \"CSS\", \"SQL\", \"Dart\", \"FlutterFlow\"]\n\nApply this same logic to all grouped or compound skill mentions.\n\nIf you do not know the value of an attribute asked to extract, put null or \"\" in the relevant field.  \nIf the years of experience are unclear or missing, return 0."
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.informationExtractor",
+      "typeVersion": 1.2,
+      "position": [
+        820,
+        20
+      ],
+      "id": "bb5b17f9-a9c6-43c4-baa5-14c2aa764b72",
+      "name": "Extract data",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "model": "mistral-medium-latest",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatMistralCloud",
+      "typeVersion": 1,
+      "position": [
+        900,
+        240
+      ],
+      "id": "7fa68c13-e9f0-4af4-b75e-6cbbb4479238",
+      "name": "Mistral Medium Latest",
+      "credentials": {
+        "mistralCloudApi": {
+          "id": "ZJFpFv0Id8255BGV",
+          "name": "Mistral Cloud account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "search",
+        "base": {
+          "__rl": true,
+          "value": "appQJsrXFIPn3bkPd",
+          "mode": "list",
+          "cachedResultName": "Job Position Management",
+          "cachedResultUrl": "https://airtable.com/appQJsrXFIPn3bkPd"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblQWptzYwqmRB5u6",
+          "mode": "list",
+          "cachedResultName": "Job Positions",
+          "cachedResultUrl": "https://airtable.com/appQJsrXFIPn3bkPd/tblQWptzYwqmRB5u6"
+        },
+        "filterByFormula": "{Open} = TRUE()",
+        "options": {
+          "fields": [
+            "Position Title",
+            "Years of Experience Required",
+            "Skills Required"
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        1196,
+        20
+      ],
+      "id": "ad6eb5a8-24b5-429e-97a7-c649eb32bbbf",
+      "name": "Search records",
+      "alwaysOutputData": false,
+      "executeOnce": false,
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "jjBM9pAJrEQRpDhq",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=## You are an expert in recruitment and candidate screening. Compare the following candidate profile with a list of open jobs.\n\n## STRICT MATCHING RULES:\nOnly return a job match if BOTH of the following conditions are true:\n1. The candidate's \"years_of_experience\" is **greater than or equal** to the job's \"Years of Experience Required\".\n2. The candidate matches **at least 75% of the job's required skills**.\n  - For example: if a job requires 4 skills, the candidate must have at least 3 of them in their skill list.\n\n## DATA:\nCandidate JSON\n{{ JSON.stringify($('Extract data').item.json.output, null, 2) }}\n\nJob list JSON\n{{ JSON.stringify($('Search records').all().map(i => i.json), null, 2) }}\n\n## OUTPUT:\nReturn only this JSON format if the candidate fits the job:\n\n\"matched_role\": \"POSITION_TITLE\"\n\nDo NOT include any extra explanation, text, or markdown formatting. Return null or \"\" if there's no job that fits\n",
+        "hasOutputParser": true,
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 2,
+      "position": [
+        1416,
+        20
+      ],
+      "id": "a5d80056-9685-4cee-9f1f-e401d3cca1a3",
+      "name": "AI Agent",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "model": "mistral-medium-latest",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatMistralCloud",
+      "typeVersion": 1,
+      "position": [
+        1444,
+        240
+      ],
+      "id": "ba6a6e26-b90d-4c5b-bbc4-a58f4535c1da",
+      "name": "Mistral Cloud Chat Model",
+      "credentials": {
+        "mistralCloudApi": {
+          "id": "ZJFpFv0Id8255BGV",
+          "name": "Mistral Cloud account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"match\": true,\n  \"matched_role\": \"position_title\"\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        1564,
+        240
+      ],
+      "id": "f6c96f1c-7764-4f0c-a0fa-20eb860021de",
+      "name": "Structured Output Parser"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "01a2e249-48a4-4c21-bc2e-a23401d0b37b",
+              "leftValue": "={{ $json.output.matched_role }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1800,
+        20
+      ],
+      "id": "c035b9db-8ce1-4788-b792-dcf5cad7c27d",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "sendTo": "yuriy185000+HR@gmail.com",
+        "subject": "New Applicant",
+        "emailType": "text",
+        "message": "=Hey, there is a new applicant that fits to {{ $('AI Agent').item.json.output.matched_role }} role \n\nCheck him out here\nhttps://airtable.com/appQJsrXFIPn3bkPd/tblXZ025NbAwIeNxL/viw3Tjf1CU5CnUuj4?blocks=hide",
+        "options": {
+          "appendAttribution": false,
+          "senderName": "no-reply"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2640,
+        -80
+      ],
+      "id": "b435db35-f9d2-4f08-bc33-2061107334ce",
+      "name": "Send a message",
+      "webhookId": "8c6b1ba1-3e02-4d21-90d4-e2c235d04a35",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "e24IutEfe3MeoZBH",
+          "name": "Gmail account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "base": {
+          "__rl": true,
+          "value": "appQJsrXFIPn3bkPd",
+          "mode": "list",
+          "cachedResultName": "Job Position Management",
+          "cachedResultUrl": "https://airtable.com/appQJsrXFIPn3bkPd"
+        },
+        "table": {
+          "__rl": true,
+          "value": "tblXZ025NbAwIeNxL",
+          "mode": "list",
+          "cachedResultName": "Applicants",
+          "cachedResultUrl": "https://airtable.com/appQJsrXFIPn3bkPd/tblXZ025NbAwIeNxL"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Skills": "={{ $('Extract data').item.json.output.skills.join(', ') }}",
+            "Position Applied For": "={{ $json.output.matched_role }}",
+            "Full Name": "={{ $('Tally Webhook').item.json.body.data.fields[0].value }}",
+            "Email": "={{ $('Tally Webhook').item.json.body.data.fields[2].value }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Full Name",
+              "displayName": "Full Name",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Position Applied For",
+              "displayName": "Position Applied For",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            },
+            {
+              "id": "Skills",
+              "displayName": "Skills",
+              "required": false,
+              "defaultMatch": false,
+              "canBeUsedToMatch": true,
+              "display": true,
+              "type": "string",
+              "readOnly": false,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.airtable",
+      "typeVersion": 2.1,
+      "position": [
+        2240,
+        -80
+      ],
+      "id": "b9b4bd5e-ca3f-4ffc-9c14-7b049a3363af",
+      "name": "Create a record",
+      "credentials": {
+        "airtableTokenApi": {
+          "id": "jjBM9pAJrEQRpDhq",
+          "name": "Airtable Personal Access Token account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Tally Webhook').item.json.body.data.fields[2].value }}",
+        "subject": "Application request completed",
+        "emailType": "text",
+        "message": "=Hi, {{ $('Tally Webhook').item.json.body.data.fields[0].value }}! \n\nAfter thorough consideration of your professional profile and the requirements of the role, we would like to inform you that at this point we will choose another candidate to move further.\n\nBest,\nHR team\n\n\n\n",
+        "options": {
+          "appendAttribution": false,
+          "senderName": "no-reply"
+        }
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        2240,
+        120
+      ],
+      "id": "5ddcd230-b2cd-42b5-906b-604828e2f808",
+      "name": "Send a message1",
+      "webhookId": "8c6b1ba1-3e02-4d21-90d4-e2c235d04a35",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "e24IutEfe3MeoZBH",
+          "name": "Gmail account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Parse PDF": {
+      "main": [
+        [
+          {
+            "node": "Wrap up response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tally Webhook": {
+      "main": [
+        [
+          {
+            "node": "Get PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get PDF": {
+      "main": [
+        [
+          {
+            "node": "Parse PDF",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wrap up response": {
+      "main": [
+        [
+          {
+            "node": "Extract data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract data": {
+      "main": [
+        [
+          {
+            "node": "Search records",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mistral Medium Latest": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Extract data",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Search records": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mistral Cloud Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Structured Output Parser": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "Create a record",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send a message1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send a message": {
+      "main": [
+        []
+      ]
+    },
+    "Create a record": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "b03e8736-aaea-4464-ab00-5ff65083cb87",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "aa84735fcd6f019200ed251665b5685de73bc00f0b8797fe881e102232632001"
+  },
+  "id": "9TUDxkaWX83e3uuv",
+  "tags": []
+}
