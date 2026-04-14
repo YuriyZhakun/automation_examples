@@ -69,10 +69,16 @@ Accepts `country_name`, `after_date` (YYYY-MM-DD), and an optional `formatter` p
 
 ---
 
-### CSV Script
+## [CSV Script](./csv-script/index.js)
 
-Node.js script (not an n8n workflow) that fetches users, posts, and comments from the JSONPlaceholder API and writes the results to a CSV file.
+Node.js script that fetches users, posts, and comments from the JSONPlaceholder API and writes the results to a CSV file.
 
 Filters users with even IDs, fetches the latest 5 posts per user and the latest 3 comments per post. Uses concurrent requests with `Promise.all`, automatic retries with exponential backoff, data validation, and structured logging. Output is written to `output.csv`.
 
-Source: [CSV script (GitHub)](https://github.com/YuriyZhakun/automation_examples)
+**Installation:**
+```
+npm install
+npm start
+```
+
+**Dependencies:** axios, csv-writer
