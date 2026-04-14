@@ -9,7 +9,7 @@ Examples of n8n workflows. To use any of them:
 
 ---
 
-## [Longship QA](./longship-qa/Longship%20QA.json)
+## [Doc Editor](./doc-editor/Doc%20Editor.json)
 
 Automated QA agent for Markdown documentation in a GitHub repository.
 
@@ -19,7 +19,7 @@ The workflow reads a Markdown file from GitHub, runs it through two Mistral Larg
 
 ---
 
-## [MFP AI Agent](./mfp-ai-agent/MFP%20AI%20agent.json)
+## [Issue Tracker](./issue-tracker/Issue%20Tracker.json)
 
 AI-powered GitHub issue tracker with semantic search via Telegram.
 
