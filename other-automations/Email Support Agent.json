@@ -1,0 +1,532 @@
+{
+  "name": "Email Support Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "text": "={{ $json.snippet }}",
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"report\",\n  \"office_id\": 123456,\n  \"listing_id\": 987654,\n  \"target_currency\": \"EUR\"\n}",
+        "options": {
+          "systemPromptTemplate": "=## You are a customer support assistant for a real estate platform. Your job is to analyze the body of user's incoming email and determine what kind of request the user is making.\n\n## Your responsibilities:\n\n1. Classify the type of request:\n   - \"report\" → if the user is asking for a performance report of an office (e.g., office performance, office_id, summary).\n   - \"location\" → if the user is asking for information about a specific listing (e.g., city, price, location of a listing_id).\n   - null → if the request doesn't match either category.\n\n2. Extract the following parameters:\n   - `type` (string) — null if not applicable.\n   - `office_id` (integer) — null if not applicable.\n   - `listing_id` (integer) — null if not applicable.\n   - `target_currency` (string) — if the user is asking for the price in a specific currency (use ISO 4217 currency code, e.g., \"USD\", \"EUR\", \"CAD\") and null if not applicable"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.informationExtractor",
+      "typeVersion": 1.2,
+      "position": [96, 400],
+      "id": "77653284-c3fe-4120-bc99-1a681f8a8422",
+      "name": "Information Extractor",
+      "alwaysOutputData": false,
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "model": "mistral-medium",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatMistralCloud",
+      "typeVersion": 1,
+      "position": [192, 624],
+      "id": "aa7da9cd-1a3b-483f-a4c3-2bf42de34ffe",
+      "name": "Mistral Cloud Chat Model",
+      "credentials": {
+        "mistralCloudApi": {
+          "id": "tUTHLcGjKTecrDBy",
+          "name": "Mistral Cloud account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  COUNT(DISTINCT l.listing_id) AS total_listings,\n  SUM(CAST(e.pageviews AS INTEGER)) AS total_pageviews,\n  SUM(e.leads) AS total_leads,\n  CASE \n    WHEN SUM(CAST(e.pageviews AS INTEGER)) > 0 \n    THEN ROUND(SUM(e.leads)::DECIMAL / SUM(CAST(e.pageviews AS INTEGER)) * 100, 2) \n    ELSE 0 \n  END AS conversion_rate,\n  ROUND(AVG(e.leads)::DECIMAL, 2) AS avg_lead_value\nFROM engagement e \nJOIN listings l ON e.listing_id = l.listing_id\nWHERE l.office_id = {{ $('Information Extractor').item.json.output.office_id }}::TEXT;",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [1840, 128],
+      "id": "7ca80005-6ab7-4480-8124-e882b0382733",
+      "name": "Average Analytics SQL",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "OvJZ6ZAtoKkHzZ81",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  agg.listing_id,\n  agg.total_pageviews,\n  agg.total_leads,\n  CASE \n    WHEN agg.total_pageviews > 0 \n    THEN ROUND(agg.total_leads::DECIMAL / agg.total_pageviews * 100, 2)\n    ELSE 0\n  END AS conversion_rate\n  \nFROM (\n  SELECT \n    e.listing_id,\n    SUM(CAST(e.pageviews AS INTEGER)) AS total_pageviews,\n    SUM(e.leads) AS total_leads\n  FROM engagement e\n  JOIN listings l ON e.listing_id = l.listing_id\n  WHERE l.office_id = {{ $('Information Extractor').item.json.output.office_id }}::TEXT\n  GROUP BY e.listing_id\n) AS agg\nORDER BY agg.total_pageviews DESC\nLIMIT 3;\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [2304, 112],
+      "id": "8e96e281-a2c3-4d9e-a6f7-f825666adb49",
+      "name": "Top 3 Listings SQL",
+      "credentials": {
+        "postgres": {
+          "id": "OvJZ6ZAtoKkHzZ81",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT \n  listing_id,\n  country_code,\n  ROUND(price_cents::BIGINT / 100.0, 2) AS price,\n  currency,\n  longitude,\n  latitude\nFROM listings\nWHERE listing_id = {{ $json.output.listing_id }};\n",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "position": [736, 640],
+      "id": "6265893b-c1d6-4696-b1b2-664cfc26c904",
+      "name": "Listing SQL",
+      "alwaysOutputData": true,
+      "credentials": {
+        "postgres": {
+          "id": "OvJZ6ZAtoKkHzZ81",
+          "name": "Postgres account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "f20a0476-b5a0-48ee-b01a-e0f34e5d46bd",
+              "leftValue": "={{ $('Information Extractor').item.json.output.target_currency }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "exists",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "d12bb542-a7d6-4687-aa10-48dff94e4fda",
+              "leftValue": "={{ $('Information Extractor').item.json.output.target_currency }}",
+              "rightValue": "={{ $('Listing SQL').item.json.currency }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1376, 736],
+      "id": "afb57b02-ed81-4532-b8d7-0289059c62d3",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "url": "https://api.bigdatacloud.net/data/reverse-geocode-client",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {"name": "latitude", "value": "={{ $json.latitude }}"},
+            {"name": "longitude", "value": "={{ $json.longitude }}"},
+            {"name": "localityLanguage", "value": "en"}
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1168, 736],
+      "id": "da9be779-6bac-4758-86c5-d7071d4ba84c",
+      "name": "Location API",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2},
+                "conditions": [{"leftValue": "={{ $json.output.type }}", "rightValue": "report", "operator": {"type": "string", "operation": "equals"}, "id": "5a5e762e-8d91-4a16-aa39-44c4cb0ff2e3"}],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "report"
+            },
+            {
+              "conditions": {
+                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2},
+                "conditions": [{"id": "71837220-8fda-4668-bef7-952b8c50248b", "leftValue": "={{ $json.output.type }}", "rightValue": "", "operator": {"type": "string", "operation": "notExists", "singleValue": true}}],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "null"
+            },
+            {
+              "conditions": {
+                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2},
+                "conditions": [{"id": "ce1be18b-f521-41c4-b5e0-98467ec4a97f", "leftValue": "={{ $json.output.type }}", "rightValue": "location", "operator": {"type": "string", "operation": "equals", "name": "filter.operator.equals"}}],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "location"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [480, 384],
+      "id": "c8d5a064-afb5-47a4-840c-057e32a9ad70",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "url": "https://api.frankfurter.app/latest",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {"name": "amount", "value": "={{ $('Listing SQL').item.json.price }}"},
+            {"name": "from", "value": "={{ $('Listing SQL').item.json.currency }}"},
+            {"name": "to", "value": "={{ $('Information Extractor').item.json.output.target_currency }}"}
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1616, 624],
+      "id": "ccbee737-2c61-4b35-9d3f-95a61dfd9894",
+      "name": "Currency API",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "sendTo": "={{ $('Gmail Incoming').item.json.From.match(/<([^>]+)>/)?.[1] || $('Gmail Incoming').item.json.From }}",
+        "subject": "Your Request",
+        "message": "={{ $json.email_body }}",
+        "options": {"appendAttribution": false, "senderName": "Email Support Agent"}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [2768, 464],
+      "id": "8f059037-71de-4f5f-9f2b-76c51075f508",
+      "name": "Send a message",
+      "webhookId": "7fca3b0f-374c-4ba1-92fb-a704db0d3b11",
+      "credentials": {
+        "gmailOAuth2": {"id": "Dc9B5pJU4L2q9UAV", "name": "Gmail account 15"}
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0bca3f49-f613-4eaf-b820-9f349303fc6a",
+              "name": "email_body",
+              "value": "={{ \n(() => {\n  const summary = $('Average Analytics SQL').item.json;\n  const topListings = $('Top 3 Listings SQL').all().map(i => i.json);\n  const office_id = $('Switch').item.json.output.office_id;\n\n  return `\n    <div style=\"font-family: Arial, sans-serif; font-size: 14px; color: #333; line-height: 1.6;\">\n      <p>Hello,</p>\n      <p>Thank you for your request. Here's the performance summary for the office <strong>${office_id}</strong>:</p>\n      <h3>📊 <u>Overall Performance</u></h3>\n      <ul style=\"margin-left: 20px;\">\n        <li><strong>Total listings:</strong> ${summary.total_listings}</li>\n        <li><strong>Total page views:</strong> ${summary.total_pageviews}</li>\n        <li><strong>Total leads:</strong> ${summary.total_leads}</li>\n        <li><strong>Conversion rate:</strong> ${summary.conversion_rate}%</li>\n        <li><strong>Average leads (per Listing):</strong> ${summary.avg_lead_value}</li>\n      </ul>\n      <h3>🔥 <u>Top Performing Listings</u></h3>\n      ${topListings.map((listing, index) => `\n        <p style=\"margin-left: 20px;\"><strong>#${index + 1} - Listing ID:</strong> ${listing.listing_id}</p>\n        <ul style=\"margin-left: 40px;\">\n          <li><strong>Page views:</strong> ${listing.total_pageviews}</li>\n          <li><strong>Leads:</strong> ${listing.total_leads}</li>\n          <li><strong>Conversion rate:</strong> ${listing.conversion_rate}%</li>\n        </ul>\n      `).join('')}\n      <p>If you need further assistance or exports, feel free to reach out.</p>\n      <p>Best regards,<br>Your Support Team</p>\n    </div>\n  `;\n})() \n}}\n",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2512, 112],
+      "id": "12310512-8efd-42e9-9d19-6c064d8f6c49",
+      "name": "Report Email Body",
+      "executeOnce": true
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0bca3f49-f613-4eaf-b820-9f349303fc6a",
+              "name": "email_body",
+              "value": "={{\n(() => {\n  const { countryName, city, locality } = $('Location API').item.json;\n  const { currency, country_code } = $('Listing SQL').item.json;\n  const price = $json.finalPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });\n  const targetCurrency = $('Information Extractor').item.json.output?.target_currency || currency || 'USD';\n  const finalCountry = `${countryName || \"Unknown Country\"} (${country_code})`;\n  const finalCity = city || `Unknown city (${locality})`;\n  const finalCurrency = targetCurrency;\n\n  return `\n    <p>Hello,</p>\n    <p>Thank you for your request. Below is the information we could retrieve regarding the requested listing:</p>\n    <h3>📍 Location Details</h3>\n    <ul style=\"margin-left: 20px;\">\n      <li><strong>Country:</strong> ${finalCountry}</li>\n      <li><strong>City:</strong> ${finalCity}</li>\n      <li><strong>Price:</strong> ${price} ${finalCurrency}</li>\n    </ul>\n    <p>If you need more details or support with similar listings, feel free to contact us.</p>\n    <p>Best regards,<br>Your Support Team</p>\n  `;\n})()\n}}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2528, 848],
+      "id": "f6197eb6-7814-4b9b-ae39-e0df01c49225",
+      "name": "Location Email Body"
+    },
+    {
+      "parameters": {
+        "pollTimes": {"item": [{"mode": "everyMinute"}]},
+        "filters": {"labelIds": ["INBOX"]}
+      },
+      "type": "n8n-nodes-base.gmailTrigger",
+      "typeVersion": 1.2,
+      "position": [-112, 400],
+      "id": "859c198b-0553-485b-a1fc-b7e2398c544e",
+      "name": "Gmail Incoming",
+      "credentials": {
+        "gmailOAuth2": {"id": "Dc9B5pJU4L2q9UAV", "name": "Gmail account 15"}
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {"__rl": true, "value": "1V0EyltkPBDh6tW83kmIommmACW0zxPuu9sQvs3MOz7k", "mode": "list", "cachedResultName": "Email Support Agent"},
+        "sheetName": {"__rl": true, "value": "gid=0", "mode": "list", "cachedResultName": "Test"},
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ new Date().toISOString().split('T')[0] }}",
+            "Sender email": "={{ $('Gmail Incoming').item.json.From.match(/<([^>]+)>/)?.[1] || $('Gmail Incoming').item.json.From }}",
+            "Type of request": "={{ $('Information Extractor').item.json.output.type }}",
+            "Input values": "={{ $('Information Extractor').item.json.output.listing_id || $('Information Extractor').item.json.output.office_id }}",
+            "Outcome": "Error"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {"id": "Timestamp", "displayName": "Timestamp", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false},
+            {"id": "Sender email", "displayName": "Sender email", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false},
+            {"id": "Type of request", "displayName": "Type of request", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false},
+            {"id": "Input values", "displayName": "Input values", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false},
+            {"id": "Outcome", "displayName": "Outcome", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false}
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [2304, 400],
+      "id": "98b03054-8332-43a7-a1d0-666e4e0d2b6e",
+      "name": "Append row error",
+      "retryOnFail": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {"id": "FhaHm7GgsI6Pp2zs", "name": "Google Sheets account 13"}
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {"__rl": true, "value": "1V0EyltkPBDh6tW83kmIommmACW0zxPuu9sQvs3MOz7k", "mode": "list", "cachedResultName": "Email Support Agent"},
+        "sheetName": {"__rl": true, "value": "gid=0", "mode": "list", "cachedResultName": "Test"},
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Timestamp": "={{ new Date().toISOString().split('T')[0] }}",
+            "Sender email": "={{ $('Gmail Incoming').item.json.From.match(/<([^>]+)>/)?.[1] || $('Gmail Incoming').item.json.From }}",
+            "Type of request": "={{ $('Information Extractor').item.json.output.type }}",
+            "Input values": "={{ $('Information Extractor').item.json.output.listing_id || $('Information Extractor').item.json.output.office_id }}",
+            "Outcome": "Success"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {"id": "Timestamp", "displayName": "Timestamp", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false},
+            {"id": "Sender email", "displayName": "Sender email", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false},
+            {"id": "Type of request", "displayName": "Type of request", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false},
+            {"id": "Input values", "displayName": "Input values", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false},
+            {"id": "Outcome", "displayName": "Outcome", "required": false, "defaultMatch": false, "display": true, "type": "string", "canBeUsedToMatch": true, "removed": false}
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [2960, 464],
+      "id": "5046a81e-6686-4bee-a1fb-e6cf505a5cbd",
+      "name": "Append row success",
+      "retryOnFail": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {"id": "FhaHm7GgsI6Pp2zs", "name": "Google Sheets account 13"}
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2},
+          "conditions": [{"id": "fedd4362-9522-4e02-b5c4-b3c39a4bce26", "leftValue": "={{ $json.total_listings }}", "rightValue": "0", "operator": {"type": "string", "operation": "notStartsWith"}}],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2064, 128],
+      "id": "3bd79da9-088c-4861-9645-4fba431fa450",
+      "name": "If Error 1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2},
+          "conditions": [{"id": "52044917-ee57-4b5d-aa4b-0db284af4370", "leftValue": "={{ $json.listing_id }}", "rightValue": "", "operator": {"type": "number", "operation": "empty", "singleValue": true}}],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [944, 640],
+      "id": "3f962977-64b7-4ed0-98f2-4c39ca16cb7f",
+      "name": "If Error 2"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [{"id": "067dad2c-c8f9-45ce-8292-9a1201b21d8e", "name": "finalPrice", "value": "={{ $('Listing SQL').item.json.price }}", "type": "number"}]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1616, 848],
+      "id": "013daff2-b381-4404-a4c0-12a2214e2f73",
+      "name": "Edit Fields1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [{"id": "6f861f16-76c8-4936-92a4-bfe7c819baa8", "name": "finalPrice", "value": "={{ $json.rates[$node[\"Information Extractor\"].json.output.target_currency] }}", "type": "number"}]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [1840, 624],
+      "id": "f2be7034-6249-44e1-a3b3-febf10d67070",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "jsCode": "const getNodeSafe = nodeName => {\n  try {\n    return $(nodeName).all();\n  } catch (e) {\n    return [];\n  }\n};\n\nconst editFields = getNodeSafe(\"Edit Fields\");\nconst editFields1 = getNodeSafe(\"Edit Fields1\");\n\nreturn editFields.length > 0 ? editFields : editFields1;"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2336, 848],
+      "id": "ae0661b9-597c-43f5-addd-b14c351d53b4",
+      "name": "Formatter"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2},
+          "conditions": [{"id": "eabef999-e972-4df7-a254-722940b67b92", "leftValue": "={{ $json.finalPrice }}", "rightValue": "", "operator": {"type": "number", "operation": "empty", "singleValue": true}}],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [2064, 624],
+      "id": "5f14d7c8-312d-452a-a10e-1ccdd235b756",
+      "name": "If1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Mistral Cloud Chat Model": {
+      "ai_languageModel": [[{"node": "Information Extractor", "type": "ai_languageModel", "index": 0}]]
+    },
+    "Information Extractor": {
+      "main": [[{"node": "Switch", "type": "main", "index": 0}]]
+    },
+    "Average Analytics SQL": {
+      "main": [[{"node": "If Error 1", "type": "main", "index": 0}]]
+    },
+    "Listing SQL": {
+      "main": [[{"node": "If Error 2", "type": "main", "index": 0}]]
+    },
+    "If": {
+      "main": [
+        [{"node": "Currency API", "type": "main", "index": 0}],
+        [{"node": "Edit Fields1", "type": "main", "index": 0}]
+      ]
+    },
+    "Top 3 Listings SQL": {
+      "main": [[{"node": "Report Email Body", "type": "main", "index": 0}]]
+    },
+    "Location API": {
+      "main": [[{"node": "If", "type": "main", "index": 0}]]
+    },
+    "Switch": {
+      "main": [
+        [{"node": "Average Analytics SQL", "type": "main", "index": 0}],
+        [{"node": "Append row error", "type": "main", "index": 0}],
+        [{"node": "Listing SQL", "type": "main", "index": 0}]
+      ]
+    },
+    "Currency API": {
+      "main": [[{"node": "Edit Fields", "type": "main", "index": 0}]]
+    },
+    "Send a message": {
+      "main": [[{"node": "Append row success", "type": "main", "index": 0}]]
+    },
+    "Report Email Body": {
+      "main": [[{"node": "Send a message", "type": "main", "index": 0}]]
+    },
+    "Location Email Body": {
+      "main": [[{"node": "Send a message", "type": "main", "index": 0}]]
+    },
+    "Gmail Incoming": {
+      "main": [[{"node": "Information Extractor", "type": "main", "index": 0}]]
+    },
+    "Append row error": {
+      "main": [[]]
+    },
+    "If Error 1": {
+      "main": [
+        [{"node": "Top 3 Listings SQL", "type": "main", "index": 0}],
+        [{"node": "Append row error", "type": "main", "index": 0}]
+      ]
+    },
+    "If Error 2": {
+      "main": [
+        [{"node": "Append row error", "type": "main", "index": 0}],
+        [{"node": "Location API", "type": "main", "index": 0}]
+      ]
+    },
+    "Edit Fields1": {
+      "main": [[{"node": "Formatter", "type": "main", "index": 0}]]
+    },
+    "Edit Fields": {
+      "main": [[{"node": "If1", "type": "main", "index": 0}]]
+    },
+    "Formatter": {
+      "main": [[{"node": "Location Email Body", "type": "main", "index": 0}]]
+    },
+    "If1": {
+      "main": [
+        [{"node": "Append row error", "type": "main", "index": 0}],
+        [{"node": "Formatter", "type": "main", "index": 0}]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {"executionOrder": "v1"},
+  "versionId": "4ffa4d84-0436-4ca0-8d11-7bc325ede7b0",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "1619e4a533866a07bde14a0f23a4dc2c7835982d0ce5f57cae74ad504ab529d5"
+  },
+  "id": "gn6bBKdcKt6Nqt86",
+  "tags": []
+}
