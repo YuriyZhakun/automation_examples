@@ -1,0 +1,292 @@
+{
+  "name": "Doc Editor",
+  "nodes": [
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [496, 512],
+      "id": "f1118f5d-08b4-43f0-b61e-9bf35274b478",
+      "name": "When clicking 'Execute workflow'"
+    },
+    {
+      "parameters": {
+        "url": "https://api.github.com/repos/YuriyZhakun/longship_test/contents/README.md",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "sendHeaders": true,
+        "headerParameters": {"parameters": [{"name": "Accept", "value": "application/vnd.github.v3+json"}]},
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [784, 512],
+      "id": "a4b7a626-1cd1-4f7e-9601-f16e588cf81a",
+      "name": "GitHub: Get File",
+      "credentials": {"githubApi": {"id": "4vvcGUE00bxbZjYp", "name": "GitHub account"}}
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first().json;\nconst cleanBase64 = item.content.replace(/\\n/g, '');\nconst content    = Buffer.from(cleanBase64, 'base64').toString('utf-8');\nconst lines      = content.split('\\n');\nconst cleanLines = lines[lines.length - 1] === '' ? lines.slice(0, -1) : lines;\nconst numberedPreview = cleanLines.map((line, idx) => `${idx + 1}: ${line}`).join('\\n');\nreturn [{ json: { sha: item.sha, lines: cleanLines, total_lines: cleanLines.length, numbered_preview: numberedPreview } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [992, 512],
+      "id": "9ee3af96-6b82-43d7-acd0-5f10ff12eb0e",
+      "name": "Code: Decode File"
+    },
+    {
+      "parameters": {
+        "url": "https://api.github.com/repos/YuriyZhakun/longship_test/contents/qa-report.md",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "sendHeaders": true,
+        "headerParameters": {"parameters": [{"name": "Accept", "value": "application/vnd.github.v3+json"}]},
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [1264, 512],
+      "id": "0db894f9-e22d-42c3-a793-35f195772175",
+      "name": "GitHub: Get QA Report",
+      "credentials": {"githubApi": {"id": "4vvcGUE00bxbZjYp", "name": "GitHub account"}},
+      "disabled": true,
+      "continueOnFail": true,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "let historySummary = '';\ntry {\n  const reportData = $('GitHub: Get QA Report').first().json;\n  if (reportData && reportData.content) {\n    const cleanB64   = reportData.content.replace(/\\n/g, '');\n    const reportText = Buffer.from(cleanB64, 'base64').toString('utf-8');\n    const runBlocks  = reportText.split(/^---$/m).map(b => b.trim()).filter(b => b.startsWith('## Run:'));\n    const recentRuns = runBlocks.slice(0, 3);\n    if (recentRuns.length > 0) {\n      historySummary = recentRuns.map(block => {\n        const dateMatch  = block.match(/## Run: (.+)/);\n        const date       = dateMatch ? dateMatch[1] : 'unknown date';\n        const issueLines = block.split('\\n').filter(l => l.startsWith('- **Line') || l.startsWith('- **Lines')).map(l => '    ' + l.replace(/\\*\\*/g, '').replace(/`/g, '')).join('\\n');\n        return `- ${date}\\n` + (issueLines || '    no issues found');\n      }).join('\\n');\n    }\n  }\n} catch (e) { historySummary = ''; }\nreturn [{ json: { history_summary: historySummary } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1472, 512],
+      "id": "afddec56-1d74-4cdf-80e6-361801001319",
+      "name": "Code: Extract Memory"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Below is the Markdown file with LINE NUMBERS prepended (format: \"N: content\"). Use these exact numbers as line_number in your response.\n\n{{ $node[\"Code: Decode File\"].json[\"numbered_preview\"] }}\n{{ $node[\"Code: Extract Memory\"].json[\"history_summary\"] ? \"\\n** CHANGE HISTORY:\\n\" + $node[\"Code: Extract Memory\"].json[\"history_summary\"] : \"\" }}\n",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are a technical QA reviewer for Markdown documentation.\n\n** STRICT RULES:\n1. Focus ONLY on real problems that affect correctness or usability. Be very strict.\n2. Do NOT flag style preferences or rewrite content that is already clear and readable.\n3. Do NOT flag URL, any names, or any technical identifiers.\n4. JavaScript functions MAY be flagged as code_quality ONLY if the simplified version is functionally identical.\n5. Preserve list formatting exactly.\n6. line_number must match the exact number shown before ':' in the input.\n7. For multi-line issues, use line_start and line_end.\n8. If nothing is clearly wrong, return an empty array [].\n9. If provided, use CHANGE HISTORY to avoid re-flagging already fixed issues.\n10. Never report the same lines twice.\n\n** WHAT TO FLAG:\n- Real typos that change the meaning of a word\n- Commands that are completely unformatted plain text with no backticks\n- JavaScript functions that can be rewritten as a shorter one-liner with identical behaviour\n\n** PRIORITY LEVELS:\n- \"high\": typos that change word meaning, clearly broken syntax\n- \"medium\": code_quality simplifications, formatting issues that impact usability\n\n** OUTPUT:\n- Raw JSON array only. No explanation. No markdown. No ```json fences.\n- High and medium issues only.\n\n** JSON FORMAT:\n[{\"line_number\": N, \"issue_type\": \"grammar\", \"priority\": \"high\", \"description\": \"Describe the specific problem\", \"suggested_fix\": \"Exact single-line replacement\"}]"
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [1824, 512],
+      "id": "05bd8e28-1153-4850-8dbc-900a004ab634",
+      "name": "Agent 1: QA Analysis",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {"model": "mistral-large-latest", "options": {}},
+      "type": "@n8n/n8n-nodes-langchain.lmChatMistralCloud",
+      "typeVersion": 1,
+      "position": [1824, 736],
+      "id": "137d6063-1ce6-4896-9ff3-85e7735a245e",
+      "name": "LLM: Mistral (QA Agent)",
+      "credentials": {"mistralCloudApi": {"id": "8ylRc20NqX9iryLw", "name": "Mistral Cloud account"}}
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"output\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"line_number\":   { \"type\": \"number\" },\n          \"line_start\":    { \"type\": \"number\" },\n          \"line_end\":      { \"type\": \"number\" },\n          \"issue_type\":    { \"type\": \"string\" },\n          \"priority\":      { \"type\": \"string\" },\n          \"description\":   { \"type\": \"string\" },\n          \"suggested_fix\": { \"type\": \"string\" }\n        },\n        \"required\": [\"issue_type\", \"priority\", \"description\"]\n      }\n    }\n  },\n  \"required\": [\"output\"]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [1968, 736],
+      "id": "55fa4d68-d34a-485b-a97d-814a78b739bd",
+      "name": "Output Parser: QA",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 3},
+          "conditions": [{"id": "ed03b03f-adb0-4e00-9186-310f805a79c8", "leftValue": "={{ $json.output }}", "rightValue": "", "operator": {"type": "array", "operation": "notEmpty", "singleValue": true}}],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [2256, 512],
+      "id": "c2e2cc1d-7c92-458b-bf2d-a6b3d2ef6086",
+      "name": "If: Issues Found"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [2448, 656],
+      "id": "ca651e09-7bf7-425f-81cf-e85c74176568",
+      "name": "End: No Issues Found"
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Convert these QA issues into patch operations.\n\nFile has {{ $node[\"Code: Decode File\"].json[\"total_lines\"] }} lines total.\n\nQA Issues:\n{{ JSON.stringify($(\"Agent 1: QA Analysis\").first().json.output, null, 2) }}\n\nOriginal file for reference:\n{{ $node[\"Code: Decode File\"].json[\"numbered_preview\"] }}\n",
+        "hasOutputParser": true,
+        "messages": {
+          "messageValues": [
+            {
+              "message": "You are a precise Markdown file editor. Convert QA issues into patch operations.\n\n** ALLOWED OPERATIONS:\n1. replace: {\"operation\":\"replace\",\"line_number\":5,\"new_text\":\"corrected line\"}\n2. replace_range: {\"operation\":\"replace_range\",\"line_start\":36,\"line_end\":41,\"new_lines\":[\"replacement line\"]}\n3. insert_after: {\"operation\":\"insert_after\",\"line_number\":10,\"new_lines\":[\"new line\"]}\n4. delete: {\"operation\":\"delete\",\"line_number\":45}\n\n** STRICT RULES:\n1. Every entry in new_lines must be a SINGLE LINE.\n2. PRESERVE ALL Markdown formatting exactly.\n3. NEVER modify URLs, repository names, file paths, or variable names.\n4. Line ranges must NOT overlap.\n5. If an issue cannot be safely expressed as these operations, skip it.\n\n** OUTPUT: Return ONLY a raw JSON array. No explanation. No markdown. No ```json fences."
+            }
+          ]
+        },
+        "batching": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.9,
+      "position": [2800, 496],
+      "id": "4446c386-0a85-49d3-a7ee-1e9435783f51",
+      "name": "Agent 2: Editor",
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {"model": "mistral-large-latest", "options": {}},
+      "type": "@n8n/n8n-nodes-langchain.lmChatMistralCloud",
+      "typeVersion": 1,
+      "position": [2800, 720],
+      "id": "0f87823e-b76b-4c0a-95b5-bfa939424fe0",
+      "name": "LLM: Mistral (Editor Agent)",
+      "credentials": {"mistralCloudApi": {"id": "8ylRc20NqX9iryLw", "name": "Mistral Cloud account"}}
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"output\": {\n      \"type\": \"array\",\n      \"items\": {\n        \"type\": \"object\",\n        \"properties\": {\n          \"operation\":   { \"type\": \"string\" },\n          \"line_number\": { \"type\": \"number\" },\n          \"line_start\":  { \"type\": \"number\" },\n          \"line_end\":    { \"type\": \"number\" },\n          \"new_text\":    { \"type\": \"string\" },\n          \"new_lines\":   { \"type\": \"array\", \"items\": { \"type\": \"string\" } }\n        },\n        \"required\": [\"operation\"]\n      }\n    }\n  },\n  \"required\": [\"output\"]\n}"
+      },
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [2944, 720],
+      "id": "d41f0688-036e-41f9-9924-fb0c8013630c",
+      "name": "Output Parser: Editor",
+      "retryOnFail": true,
+      "waitBetweenTries": 3000,
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "jsCode": "const operations = $input.first().json.output;\nconst lines      = [...$node['Code: Decode File'].json['lines']];\nconst totalLines = $node['Code: Decode File'].json['total_lines'];\nif (!Array.isArray(operations)) { return [{ json: { valid: false, error: 'Editor output is not an array' } }]; }\nconst skippedOps = [];\nconst normalized = [];\nfor (const op of operations) {\n  let norm = null;\n  if (op.operation === 'replace') {\n    if (!Number.isInteger(op.line_number)) { skippedOps.push({ ...op, reason: 'replace: missing line_number' }); continue; }\n    norm = { operation: 'replace', line_start: op.line_number, line_end: op.line_number, new_lines: [op.new_text !== undefined ? String(op.new_text) : ''] };\n  } else if (op.operation === 'replace_range') {\n    if (!Number.isInteger(op.line_start) || !Number.isInteger(op.line_end)) { skippedOps.push({ ...op, reason: 'replace_range: missing range' }); continue; }\n    const newLines = Array.isArray(op.new_lines) ? op.new_lines.map(String) : (op.new_text !== undefined ? [String(op.new_text)] : []);\n    norm = { operation: 'replace_range', line_start: op.line_start, line_end: op.line_end, new_lines: newLines };\n  } else if (op.operation === 'insert_after') {\n    if (!Number.isInteger(op.line_number)) { skippedOps.push({ ...op, reason: 'insert_after: missing line_number' }); continue; }\n    const newLines = Array.isArray(op.new_lines) ? op.new_lines.map(String) : [];\n    if (newLines.length === 0) { skippedOps.push({ ...op, reason: 'insert_after: empty new_lines' }); continue; }\n    norm = { operation: 'insert_after', line_start: op.line_number, line_end: op.line_number, new_lines: newLines };\n  } else if (op.operation === 'delete') {\n    const start = op.line_number || op.line_start;\n    const end   = op.line_end || start;\n    if (!Number.isInteger(start)) { skippedOps.push({ ...op, reason: 'delete: missing line' }); continue; }\n    norm = { operation: 'delete', line_start: start, line_end: end, new_lines: [] };\n  } else { skippedOps.push({ ...op, reason: `unknown operation: ${op.operation}` }); continue; }\n  if (norm.line_start < 1 || norm.line_start > totalLines) { skippedOps.push({ ...op, reason: `line_start out of range` }); continue; }\n  if (norm.line_end < 1 || norm.line_end > totalLines) { skippedOps.push({ ...op, reason: `line_end out of range` }); continue; }\n  if (norm.new_lines.some(l => l.includes('\\n'))) { skippedOps.push({ ...op, reason: 'embedded newline' }); continue; }\n  if (norm.operation === 'replace' && norm.new_lines[0] === lines[norm.line_start - 1]) { skippedOps.push({ ...op, reason: 'identical to original' }); continue; }\n  normalized.push(norm);\n}\nnormalized.sort((a, b) => a.line_start - b.line_start);\nconst validOps = [];\nlet lastEnd = 0;\nfor (const op of normalized) {\n  if (op.line_start <= lastEnd) { skippedOps.push({ ...op, reason: `overlapping range` }); continue; }\n  lastEnd = op.line_end;\n  validOps.push(op);\n}\nif (validOps.length === 0) { return [{ json: { valid: false, error: 'No valid operations', skipped: skippedOps } }]; }\nvalidOps.sort((a, b) => b.line_start - a.line_start);\nfor (const op of validOps) {\n  const startIdx = op.line_start - 1;\n  const count    = op.line_end - op.line_start + 1;\n  if (op.operation === 'replace' || op.operation === 'replace_range') { lines.splice(startIdx, count, ...op.new_lines); }\n  else if (op.operation === 'delete') { lines.splice(startIdx, count); }\n  else if (op.operation === 'insert_after') { lines.splice(startIdx + 1, 0, ...op.new_lines); }\n}\nconst updatedContent    = lines.join('\\n') + '\\n';\nconst updatedContentB64 = Buffer.from(updatedContent).toString('base64');\nconst operationsLog = validOps.map(op => ({ operation: op.operation, line_start: op.line_start, line_end: op.line_end, new_lines_count: op.new_lines.length }));\nreturn [{ json: { valid: true, updated_content: updatedContent, updated_content_b64: updatedContentB64, applied_count: validOps.length, skipped_count: skippedOps.length, skipped_ops: skippedOps, operations_log: operationsLog } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [3296, 496],
+      "id": "41dfc87d-3982-4d85-b2fd-61e293ce7915",
+      "name": "Code: Apply Edits"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 3},
+          "conditions": [{"id": "cond-001", "leftValue": "={{ $json[\"valid\"] }}", "rightValue": "", "operator": {"type": "boolean", "operation": "true", "singleValue": true}}],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [3488, 496],
+      "id": "ab6ff3a5-a26f-46b1-b582-20e8ae3b69dc",
+      "name": "If: Patch Is Valid"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [3680, 624],
+      "id": "ee6a6bc0-28c1-4dfe-970d-47b15ba11355",
+      "name": "End: Invalid Patch – Skipped"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "https://api.github.com/repos/YuriyZhakun/longship_test/contents/README.md",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "sendHeaders": true,
+        "headerParameters": {"parameters": [{"name": "Accept", "value": "application/vnd.github.v3+json"}]},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"message\": \"AI QA: apply {{ $('Code: Apply Edits').first().json.applied_count }} edit(s) to README.md\",\n  \"content\": \"{{ $('Code: Apply Edits').first().json.updated_content_b64 }}\",\n  \"sha\": \"{{ $('Code: Decode File').first().json.sha }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [3984, 480],
+      "id": "4c14bd2c-b4df-49ce-96b9-8f521fcd07d2",
+      "name": "GitHub: Commit File",
+      "credentials": {"githubApi": {"id": "4vvcGUE00bxbZjYp", "name": "GitHub account"}}
+    },
+    {
+      "parameters": {
+        "jsCode": "const runDate     = new Date().toISOString().replace('T', ' ').slice(0, 19) + ' UTC';\nconst issues      = $('Agent 1: QA Analysis').first().json.output || [];\nconst applyResult = $('Code: Apply Edits').first().json;\nconst issueLines = issues.map(issue => { const range = issue.line_start ? `Lines ${issue.line_start}-${issue.line_end}` : `Line ${issue.line_number}`; return `- **${range}** \\`[${issue.issue_type}]\\` \\`${issue.priority}\\` -- ${issue.description}`; }).join('\\n');\nconst opsLog = (applyResult.operations_log || []).map(op => { const range = op.line_start === op.line_end ? `Line ${op.line_start}` : `Lines ${op.line_start}-${op.line_end}`; return `- \\`${op.operation}\\` ${range}` + (op.new_lines_count > 0 ? ` -> ${op.new_lines_count} line(s)` : ''); }).join('\\n');\nconst skippedSection = applyResult.skipped_count > 0 ? '\\n### Skipped operations\\n' + applyResult.skipped_ops.map(op => `- \\`${op.operation}\\` line ${op.line_start || op.line_number}: ${op.reason}`).join('\\n') + '\\n' : '';\nconst newEntry = `## Run: ${runDate}\\n` + `**Issues found:** ${issues.length} | **Applied:** ${applyResult.applied_count} | **Skipped:** ${applyResult.skipped_count}\\n\\n` + `### Issues detected\\n${issueLines || '_none_'}\\n\\n` + `### Operations applied\\n${opsLog || '_none_'}\\n` + skippedSection + `\\n---\\n\\n`;\nlet existingContent = ''; let reportSha = undefined;\ntry { const reportData = $('GitHub: Get QA Report').first().json; if (reportData && reportData.content) { const cleanB64 = reportData.content.replace(/\\n/g, ''); existingContent = Buffer.from(cleanB64, 'base64').toString('utf-8'); reportSha = reportData.sha; } } catch (e) {}\nconst header = '# QA Run Log\\n\\n';\nconst prevContent = existingContent.startsWith('# QA Run Log') ? existingContent.slice(header.length) : existingContent;\nconst fullContent = header + newEntry + prevContent;\nconst contentB64  = Buffer.from(fullContent).toString('base64');\nconst bodyObj = { message: `AI QA: log run ${runDate}`, content: contentB64 };\nif (reportSha) bodyObj.sha = reportSha;\nreturn [{ json: { report_body: JSON.stringify(bodyObj) } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [4176, 480],
+      "id": "3b55097d-004b-4577-8d97-9c08b4f32b30",
+      "name": "Code: Build Report"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "https://api.github.com/repos/YuriyZhakun/longship_test/contents/qa-report.md",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubApi",
+        "sendHeaders": true,
+        "headerParameters": {"parameters": [{"name": "Accept", "value": "application/vnd.github.v3+json"}]},
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ $json.report_body }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [4368, 480],
+      "id": "4ee4b5e7-42db-4f50-b7b1-c9fbef5059a9",
+      "name": "GitHub: Commit Report",
+      "credentials": {"githubApi": {"id": "4vvcGUE00bxbZjYp", "name": "GitHub account"}},
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "When clicking 'Execute workflow'": {"main": [[{"node": "GitHub: Get File", "type": "main", "index": 0}]]},
+    "GitHub: Get File": {"main": [[{"node": "Code: Decode File", "type": "main", "index": 0}]]},
+    "Code: Decode File": {"main": [[{"node": "GitHub: Get QA Report", "type": "main", "index": 0}]]},
+    "GitHub: Get QA Report": {"main": [[{"node": "Code: Extract Memory", "type": "main", "index": 0}]]},
+    "Code: Extract Memory": {"main": [[{"node": "Agent 1: QA Analysis", "type": "main", "index": 0}]]},
+    "Agent 1: QA Analysis": {"main": [[{"node": "If: Issues Found", "type": "main", "index": 0}]]},
+    "LLM: Mistral (QA Agent)": {"ai_languageModel": [[{"node": "Agent 1: QA Analysis", "type": "ai_languageModel", "index": 0}]]},
+    "Output Parser: QA": {"ai_outputParser": [[{"node": "Agent 1: QA Analysis", "type": "ai_outputParser", "index": 0}]]},
+    "If: Issues Found": {"main": [[{"node": "Agent 2: Editor", "type": "main", "index": 0}], [{"node": "End: No Issues Found", "type": "main", "index": 0}]]},
+    "Agent 2: Editor": {"main": [[{"node": "Code: Apply Edits", "type": "main", "index": 0}]]},
+    "LLM: Mistral (Editor Agent)": {"ai_languageModel": [[{"node": "Agent 2: Editor", "type": "ai_languageModel", "index": 0}]]},
+    "Output Parser: Editor": {"ai_outputParser": [[{"node": "Agent 2: Editor", "type": "ai_outputParser", "index": 0}]]},
+    "Code: Apply Edits": {"main": [[{"node": "If: Patch Is Valid", "type": "main", "index": 0}]]},
+    "If: Patch Is Valid": {"main": [[{"node": "GitHub: Commit File", "type": "main", "index": 0}], [{"node": "End: Invalid Patch – Skipped", "type": "main", "index": 0}]]},
+    "GitHub: Commit File": {"main": [[{"node": "Code: Build Report", "type": "main", "index": 0}]]},
+    "Code: Build Report": {"main": [[{"node": "GitHub: Commit Report", "type": "main", "index": 0}]]}
+  },
+  "active": false,
+  "settings": {"executionOrder": "v1", "binaryMode": "separate", "availableInMCP": false},
+  "versionId": "85ab0d93-2231-4b68-87c7-1bd69b5be57c",
+  "meta": {"instanceId": "fcceb79a984102a632a2d6b4a8146df18de657e04a863a1bd615031231cc053b"},
+  "id": "MzByRoEw7FIigvwI",
+  "tags": []
+}
