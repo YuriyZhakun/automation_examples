@@ -1,0 +1,276 @@
+{
+  "name": "Holidays Request",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "future-country-holidays",
+        "authentication": "basicAuth",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "fafa0356-7a2b-40e9-a61b-026120f3de97",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [320, -300],
+      "webhookId": "efdadcdd-d0a8-4060-a010-608f3202caed",
+      "credentials": {
+        "httpBasicAuth": {"id": "juqeU13d152nBKLn", "name": "webhook basic auth"}
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://date.nager.at/api/v3/AvailableCountries",
+        "options": {}
+      },
+      "id": "36e828a1-997d-4c16-9d5c-913f1ef253b7",
+      "name": "Fetch Country List",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [980, -300]
+    },
+    {
+      "parameters": {
+        "jsCode": "const countryName = $(\"Webhook\").first().json.query.country_name.toLowerCase();\nconst countryList = $input.first().json;\n\nlet countryCode = null;\nfor (const item of countryList) {\n  if ((item.name.toLowerCase()) === countryName) {\n    countryCode = item.countryCode;\n    break;\n  }\n}\nif (!countryCode) {\n  return [{ json: { error: \"Invalid country_name. Please provide a valid country name.\" } }];\n}\nreturn [{ json: { code: countryCode } }];\n"
+      },
+      "id": "a045abb7-8329-4223-95a4-c661c197e9b0",
+      "name": "Validate Country",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [1200, -300],
+      "executeOnce": false,
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "url": "={{\"https://date.nager.at/api/v3/PublicHolidays/\" + new Date($('Webhook').item.json.query.after_date).getFullYear() + \"/\" + $('Validate Country').item.json.code}}",
+        "options": {"splitIntoItems": false}
+      },
+      "id": "2fc726db-c3bd-4148-b17f-dd0081c6b072",
+      "name": "Fetch Holidays",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 1,
+      "position": [1640, -100]
+    },
+    {
+      "parameters": {
+        "respondWith": "allIncomingItems",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [2560, -60],
+      "id": "a4b1fec0-ae84-46dc-8f01-ec51764b61e2",
+      "name": "Respond to Webhook"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2},
+          "conditions": [{"id": "6ccb8872-41a8-4931-b6d2-a882a07b9835", "leftValue": "={{ $json.error }}", "rightValue": "", "operator": {"type": "string", "operation": "notEmpty", "singleValue": true}}],
+          "combinator": "or"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [760, -400],
+      "id": "24cb633e-2db1-4583-aaa3-2c3a6ddcc01b",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [980, -500],
+      "id": "72957183-d2dc-4a04-a77a-26f2ed402a80",
+      "name": "Respond to Webhook1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "loose", "version": 2},
+          "conditions": [{"id": "0f0c6660-41d2-4f0e-8b55-dc65c569cc91", "leftValue": "={{ $json.error }}", "rightValue": "", "operator": {"type": "string", "operation": "notEmpty", "singleValue": true}}],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1420, -300],
+      "id": "4495c945-c4c5-43f4-b794-a8a0df02fb9f",
+      "name": "If1"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.4,
+      "position": [1640, -300],
+      "id": "ad88b32e-17b1-4423-877f-1aa1a39b46c9",
+      "name": "Respond to Webhook2"
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all().map(item => item.json);\nconst errors = [];\n\nfor (const { query } of items) {\n  const { country_name, after_date, formatter } = query || {};\n\n  if (!country_name || !after_date) {\n    errors.push({ json: { error: \"Missing required parameter. Please provide country_name and after_date.\" } });\n  } else if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(after_date)) {\n    errors.push({ json: { error: \"Invalid after_date format. Please use YYYY-MM-DD.\" } });\n  } \n  \n  else if (formatter && ![\"alternating_case_formatter\", \"uppercase_formatter\", \"lowercase_formatter\"].includes(formatter)) {\n    errors.push({ json: { error: \"Invalid formatter value. Supported values: alternating_case_formatter, uppercase_formatter, lowercase_formatter.\" } });\n}\n\n  \n}\n\nreturn errors.length > 0 ? errors : [{ json: { error: null } }];\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [540, -400],
+      "id": "fe904d0e-7e67-4fb9-8b83-bb53f0ad759a",
+      "name": "Validate Parameters",
+      "alwaysOutputData": false
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2},
+                "conditions": [{"leftValue": "={{ $('Webhook').item.json.query.formatter }}", "rightValue": "alternating_case_formatter", "operator": {"type": "string", "operation": "equals"}, "id": "e35e0154-d27b-4b78-a614-a21e0053c2b1"}],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2},
+                "conditions": [{"id": "22c011cc-db07-450d-8359-34ca2df84fd6", "leftValue": "={{ $('Webhook').item.json.query.formatter }}", "rightValue": "uppercase_formatter", "operator": {"type": "string", "operation": "equals", "name": "filter.operator.equals"}}],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2},
+                "conditions": [{"id": "db827a33-8175-45d8-8e33-f100acbed289", "leftValue": "={{ $('Webhook').item.json.query.formatter }}", "rightValue": "lowercase_formatter", "operator": {"type": "string", "operation": "equals", "name": "filter.operator.equals"}}],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict", "version": 2},
+                "conditions": [{"id": "4369e7c3-9a24-4c2d-b5ed-eef698b3bb23", "leftValue": "={{ $('Webhook').item.json.query.formatter }}", "rightValue": "", "operator": {"type": "string", "operation": "empty", "singleValue": true}}],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [2080, -120],
+      "id": "8ccce21d-3320-4d3a-8c31-1e0549e67f3d",
+      "name": "Switch",
+      "alwaysOutputData": false,
+      "executeOnce": false
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst updatedItems = items.map((item) => {\n  item.json.filteredHolidays = item.json.filteredHolidays.map((holiday) => {\n    holiday.holiday_name = holiday.holiday_name\n      .split(\"\")\n      .map((char, index) =>\n        index % 2 === 0 ? char.toUpperCase() : char.toLowerCase(),\n      )\n      .join(\"\");\n    return holiday;\n  });\n  return item;\n});\nreturn updatedItems;\n"
+      },
+      "id": "16818960-04fe-4dc5-a18c-740beb3d7fc2",
+      "name": "altncase_formatter",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [2300, -580]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst updatedItems = items.map((item) => {\n  item.json.filteredHolidays = item.json.filteredHolidays.map((holiday) => {\n    holiday.holiday_name = holiday.holiday_name.toUpperCase();\n    return holiday;\n  });\n  return item;\n});\nreturn updatedItems;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2300, -380],
+      "id": "b049d559-e06e-4bb5-a0eb-e31b9b4729de",
+      "name": "uppercase_formatter"
+    },
+    {
+      "parameters": {
+        "jsCode": "const afterDate = new Date($('Webhook').first().json.query.after_date);\n\nconst filteredHolidays = $input.first().json\n  .filter((holiday) => new Date(holiday.date) >= afterDate)\n  .map((holiday) => ({\n    date: holiday.date,\n    holiday_name: holiday.localName\n  }));\n\nreturn { filteredHolidays };\n"
+      },
+      "id": "8fb98c7c-8841-46e9-8c8a-c71c3da21551",
+      "name": "Format Holidays",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 1,
+      "position": [1860, -100]
+    },
+    {
+      "parameters": {
+        "jsCode": "const items = $input.all();\nconst updatedItems = items.map((item) => {\n  item.json.filteredHolidays = item.json.filteredHolidays.map((holiday) => {\n    holiday.holiday_name = holiday.holiday_name.toUpperCase();\n    return holiday;\n  });\n  return item;\n});\nreturn updatedItems;\n"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2300, -180],
+      "id": "87c4b057-623f-48c4-82e3-41029198fb23",
+      "name": "uppercase_formatter1"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [[{"node": "Validate Parameters", "type": "main", "index": 0}]]
+    },
+    "Fetch Country List": {
+      "main": [[{"node": "Validate Country", "type": "main", "index": 0}]]
+    },
+    "Validate Country": {
+      "main": [[{"node": "If1", "type": "main", "index": 0}]]
+    },
+    "Fetch Holidays": {
+      "main": [[{"node": "Format Holidays", "type": "main", "index": 0}]]
+    },
+    "If": {
+      "main": [
+        [{"node": "Respond to Webhook1", "type": "main", "index": 0}],
+        [{"node": "Fetch Country List", "type": "main", "index": 0}]
+      ]
+    },
+    "If1": {
+      "main": [
+        [{"node": "Respond to Webhook2", "type": "main", "index": 0}],
+        [{"node": "Fetch Holidays", "type": "main", "index": 0}]
+      ]
+    },
+    "Validate Parameters": {
+      "main": [[{"node": "If", "type": "main", "index": 0}]]
+    },
+    "Switch": {
+      "main": [
+        [{"node": "altncase_formatter", "type": "main", "index": 0}],
+        [{"node": "uppercase_formatter", "type": "main", "index": 0}],
+        [{"node": "uppercase_formatter1", "type": "main", "index": 0}],
+        [{"node": "Respond to Webhook", "type": "main", "index": 0}]
+      ]
+    },
+    "altncase_formatter": {
+      "main": [[{"node": "Respond to Webhook", "type": "main", "index": 0}]]
+    },
+    "uppercase_formatter": {
+      "main": [[{"node": "Respond to Webhook", "type": "main", "index": 0}]]
+    },
+    "Format Holidays": {
+      "main": [[{"node": "Switch", "type": "main", "index": 0}]]
+    },
+    "uppercase_formatter1": {
+      "main": [[{"node": "Respond to Webhook", "type": "main", "index": 0}]]
+    }
+  },
+  "active": true,
+  "settings": {"executionOrder": "v1"},
+  "versionId": "efe97616-a602-4565-b181-767d738dea30",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "aa84735fcd6f019200ed251665b5685de73bc00f0b8797fe881e102232632001"
+  },
+  "id": "4NCottxwQMCj3fDA",
+  "tags": []
+}
