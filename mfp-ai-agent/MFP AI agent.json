@@ -1,0 +1,962 @@
+{
+  "name": "MFP AI agent",
+  "nodes": [
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "owner": "YuriyZhakun",
+        "repository": "mfp_ai_agent",
+        "events": [
+          "issues"
+        ],
+        "options": {}
+      },
+      "type": "n8n-nodes-base.githubTrigger",
+      "typeVersion": 1,
+      "position": [
+        -704,
+        160
+      ],
+      "id": "4b6b0f9a-ee27-440c-8fd3-272d65528953",
+      "name": "GitHub: Issue Trigger",
+      "webhookId": "d001bb7c-095d-408d-8de8-9be7468967f9",
+      "credentials": {
+        "githubOAuth2Api": {
+          "id": "yGoBgC1Vb2iNLa1S",
+          "name": "GitHub OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.action }}",
+                    "rightValue": "closed",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "e115711d-0ccf-483b-b392-685fc8f8e02a"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "closed"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "d1550e96-a502-45e1-98bf-347d059d1421",
+                    "leftValue": "={{ $json.body.action }}",
+                    "rightValue": "=opened",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "opened"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "2fb15101-6212-41b2-8072-37f7cfcc32af",
+                    "leftValue": "={{ $json.body.action }}",
+                    "rightValue": "reopened",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "reopened"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "a2b3c4d5-e6f7-8901-abcd-ef1234567890",
+                    "leftValue": "="{{ $json.body.action }}",
+                    "rightValue": "edited",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "edited"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "b3c4d5e6-f7a8-9012-bcde-f12345678901",
+                    "leftValue": "={{ $json.body.action }}",
+                    "rightValue": "deleted",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "deleted"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -480,
+        112
+      ],
+      "id": "bd6cad4c-6d98-4f2f-9008-31ff408ff869",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ 'https://cnphhwzkeiegvkftuacy.supabase.co/rest/v1/issues?github_id=eq.' + $json.body.issue.number }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "sb_publishable_TLh3O-vf_kLK8qNiCvSxTQ_oIoNB_Xc"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer sb_publishable_TLh3O-vf_kLK8qNiCvSxTQ_oIoNB_Xc"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"status\": \"closed\" }",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -256,
+        -32
+      ],
+      "id": "cda5d515-8094-40d8-8874-aff42ca7b396",
+      "name": "Supabase: Update Status → closed"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "w1",
+              "name": "github_id",
+              "value": "={{ $json.body.issue.number }}",
+              "type": "number"
+            },
+            {
+              "id": "w2",
+              "name": "title",
+              "value": "={{ $json.body.issue.title }}",
+              "type": "string"
+            },
+            {
+              "id": "w3",
+              "name": "body",
+              "value": "={{ $json.body.issue.body ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "w4",
+              "name": "url",
+              "value": "={{ $json.body.issue.html_url }}",
+              "type": "string"
+            },
+            {
+              "id": "w5",
+              "name": "status",
+              "value": "={{ $json.body.issue.state }}",
+              "type": "string"
+            },
+            {
+              "id": "w6",
+              "name": "embed_text",
+              "value": "={{ $json.body.issue.title + '\\n\\n' + ($json.body.issue.body || 'No description') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -256,
+        160
+      ],
+      "id": "04a45faa-a4bc-46d7-a140-32711e5851dc",
+      "name": "Set: Prepare from Webhook"
+    },
+    {
+      "parameters": {
+        "method": "DELETE",
+        "url": "={{ 'https://cnphhwzkeiegvkftuacy.supabase.co/rest/v1/issues?github_id=eq.' + $json.body.issue.number }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "sb_publishable_TLh3O-vf_kLK8qNiCvSxTQ_oIoNB_Xc"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer sb_publishable_TLh3O-vf_kLK8qNiCvSxTQ_oIoNB_Xc"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -256,
+        352
+      ],
+      "id": "09652d3f-9596-40b1-a830-819a40e857d2",
+      "name": "Supabase: Delete Issue"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "AIzaSyDAUZZBoqgmvbQjLJaEwPDVofN7sg4iNmY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'models/gemini-embedding-001', content: { parts: [{ text: $json.embed_text }] }, outputDimensionality: 768 }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -32,
+        352
+      ],
+      "id": "304b99eb-1598-4cd3-82b8-9c10fa91e543",
+      "name": "Gemini: Get Embedding"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://cnphhwzkeiegvkftuacy.supabase.co/rest/v1/issues?on_conflict=github_id",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "sb_publishable_TLh3O-vf_kLK8qNiCvSxTQ_oIoNB_Xc"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer sb_publishable_TLh3O-vf_kLK8qNiCvSxTQ_oIoNB_Xc"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "resolution=merge-duplicates"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ github_id: $('Set: Prepare from Webhook').item.json.github_id ?? $('Set: Prepare Fields').item.json.github_id, title: $('Set: Prepare from Webhook').item.json.title ?? $('Set: Prepare Fields').item.json.title, body: $('Set: Prepare from Webhook').item.json.body ?? $('Set: Prepare Fields').item.json.body, url: $('Set: Prepare from Webhook').item.json.url ?? $('Set: Prepare Fields').item.json.url, status: $('Set: Prepare from Webhook').item.json.status ?? $('Set: Prepare Fields').item.json.status, embedding: $json.embedding.values }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        192,
+        352
+      ],
+      "id": "f63ed925-9225-41c5-bf25-02cc97ccbe5e",
+      "name": "Supabase: Upsert Issue"
+    },
+    {
+      "parameters": {},
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        -704,
+        544
+      ],
+      "id": "6bb41a9d-700c-4b63-b5d1-cf3df9ddb21c",
+      "name": "▶️ Run Once"
+    },
+    {
+      "parameters": {
+        "url": "https://api.github.com/repos/YuriyZhakun/mfp_ai_agent/issues",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "githubOAuth2Api",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "state",
+              "value": "all"
+            },
+            {
+              "name": "per_page",
+              "value": "100"
+            }
+          ]
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Accept",
+              "value": "application/vnd.github+json"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -480,
+        544
+      ],
+      "id": "78c7ad3c-ecc4-4d15-8a41-9f158c4c522a",
+      "name": "GitHub: Get All Issues",
+      "credentials": {
+        "githubOAuth2Api": {
+          "id": "yGoBgC1Vb2iNLa1S",
+          "name": "GitHub OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "f1",
+              "name": "github_id",
+              "value": "={{ $json.number }}",
+              "type": "number"
+            },
+            {
+              "id": "f2",
+              "name": "title",
+              "value": "={{ $json.title }}",
+              "type": "string"
+            },
+            {
+              "id": "f3",
+              "name": "body",
+              "value": "={{ $json.body ?? '' }}",
+              "type": "string"
+            },
+            {
+              "id": "f4",
+              "name": "url",
+              "value": "={{ $json.html_url }}",
+              "type": "string"
+            },
+            {
+              "id": "f5",
+              "name": "status",
+              "value": "={{ $json.state }}",
+              "type": "string"
+            },
+            {
+              "id": "f6",
+              "name": "embed_text",
+              "value": "={{ $json.title + '\\n\\n' + ($json.body || 'No description') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -256,
+        544
+      ],
+      "id": "a69cb152-dcd4-4994-9f6a-94825734b89c",
+      "name": "Set: Prepare Fields"
+    },
+    {
+      "parameters": {
+        "chatId": "440014045",
+        "text": "=☑️  Ticket closed\n\n📌  <b><a href=\"{{ $('Switch').item.json.body.issue.html_url }}\">{{ $('Switch').item.json.body.issue.title }}</a></b>",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -32,
+        -32
+      ],
+      "id": "4ce0cfcf-6dd7-4ed7-90f1-8e6b938a2f8f",
+      "name": "Telegram: Send Notification1",
+      "webhookId": "99846f59-0f7f-4f09-abee-16176c7f909e",
+      "credentials": {
+        "telegramApi": {
+          "id": "uBKPO989QhgvCWdT",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "updates": [
+          "message"
+        ],
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.telegramTrigger",
+      "typeVersion": 1.1,
+      "position": [
+        -704,
+        976
+      ],
+      "id": "e6938670-02a5-48cf-8ec5-c4fd496aa208",
+      "name": "Telegram: Receive Message",
+      "webhookId": "telegram-search-webhook",
+      "credentials": {
+        "telegramApi": {
+          "id": "uBKPO989QhgvCWdT",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "q1",
+              "name": "query_text",
+              "value": "={{ $json.message.text.replace('/search ', '').trim() }}",
+              "type": "string"
+            },
+            {
+              "id": "q2",
+              "name": "chat_id",
+              "value": "={{ $json.message.chat.id }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -256,
+        880
+      ],
+      "id": "19a24bc1-bc58-40a5-ac08-ae9aae91ed3e",
+      "name": "Set: Extract Query"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://generativelanguage.googleapis.com/v1beta/models/gemini-embedding-001:embedContent",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "key",
+              "value": "AIzaSyDAUZZBoqgmvbQjLJaEwPDVofN7sg4iNmY"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: 'models/gemini-embedding-001', content: { parts: [{ text: $json.query_text }] } , outputDimensionality: 768 }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -32,
+        880
+      ],
+      "id": "3b0c125b-6962-4860-b818-5d70ff51c446",
+      "name": "Gemini: Embed Query"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://cnphhwzkeiegvkftuacy.supabase.co/rest/v1/rpc/search_issues",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "sb_publishable_TLh3O-vf_kLK8qNiCvSxTQ_oIoNB_Xc"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer sb_publishable_TLh3O-vf_kLK8qNiCvSxTQ_oIoNB_Xc"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ query_embedding: $json.embedding.values, match_count: 4 }) }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        192,
+        880
+      ],
+      "id": "d619cec2-59cc-4e0d-b114-f56d907914e8",
+      "name": "Supabase: RPC search_issues"
+    },
+    {
+      "parameters": {
+        "jsCode": "const THRESHOLD_BEST = 0.6;\nconst THRESHOLD_REST = 0.55;\n\nconst items = $input.all();\nconst chatId = $('Set: Extract Query').first().json.chat_id;\nconst tickets = items.map(item => item.json);\n\nif (!items.length || tickets[0].similarity < THRESHOLD_BEST) {\n  return [{ json: { chat_id: chatId, message: '🤷 No relevant tickets found for your query.' } }];\n}\n\nconst formatBest = (r) => {\n  const pct = Math.round((r.similarity ?? 0) * 100);\n  const status = r.status === 'open' ? '🟢' : '☑️';\n  return `${status}  <b><a href=\"${r.url}\">${r.title}</a></b>\\n🎚  Search match: ${pct}%`;\n};\n\nconst formatRest = (r) => {\n  const status = r.status === 'open' ? '🟢' : '☑️';\n  return `${status}  <a href=\"${r.url}\">${r.title}</a>`;\n};\n\nconst best = formatBest(tickets[0]);\nconst rest = tickets.slice(1)\n  .filter(r => r.similarity >= THRESHOLD_REST)\n  .map(r => formatRest(r)).join('\\n\\n');\n\nconst message = `🔍 <b>Search results:</b>\\n\\n${best}`\n  + (rest ? `\\n\\n\\n💡 Also relevant\\n\\n${rest}` : '');\n\nreturn [{ json: { chat_id: chatId, message } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        416,
+        880
+      ],
+      "id": "eeefae9d-b202-424b-b676-2135900ad3ee",
+      "name": "Code: Format Results"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $json.chat_id }}",
+        "text": "={{ $json.message }}",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        640,
+        880
+      ],
+      "id": "4cd00e65-104b-45d5-a31e-1bc3a25c0962",
+      "name": "Telegram: Send Results",
+      "webhookId": "e224767a-d7f5-4cb6-981f-f6b914fe9879",
+      "credentials": {
+        "telegramApi": {
+          "id": "uBKPO989QhgvCWdT",
+          "name": "Telegram account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "## Semantic Search \n\n\n**⚠️ Edge Case Handling**\n\n\n**Irrelevant / nonsense search query**\nSimilarity threshold: Best match must score ≥ 0.60, Also relevant ≥ 0.55.\nQueries like \"how's it going?\" return 🤷 No relevant tickets found.\n\n**Duplicate ticket on upsert**\nSupabase upsert uses `on_conflict=github_id` + `resolution=merge-duplicates`.\nRe-opened or edited tickets overwrite existing records cleanly.\n\n**Deleted ticket**\nSwitch routes `deleted` action to a Supabase DELETE request by github_id.\nKeeps vector store in sync with actual repository state.\n\n**Ticket with no description**\n`body ?? ''` in Set node prevents null errors. embed_text falls\nback to `'No description'` so Gemini always receives valid input.\n\n**Gemini API rate limit**\nCurrently not retried automatically. For production: add a Wait node + retry loop,\nor use n8n's built-in error trigger to requeue failed embeddings.",
+        "height": 592,
+        "width": 2320,
+        "color": 7
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1408,
+        800
+      ],
+      "id": "b5d6bc0d-279e-4c2a-bc78-e5e67d5e6067",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "## Notification + Autosync \n\n\n**🛠️ Tool Rationale**\n\n\n**GitHub** (instead of Jira)\nUsed as project management sourceю Issues serve\nas tickets with open/closed states. Chosen for simplicity and free API access.\n\n\n**n8n** \nWorkflow orchestrator with native webhook support,\nHTTP nodes, and JavaScript execution. Gives full control\nover data transformation without vendor lock-in.\n\n\n**Gemini Embedding API** (`gemini-embedding-001`)\nGoogle's embedding model producing 768-dimensional vectors.\nChosen for generous free tier and strong semantic\nunderstanding for ticket search.\n\n\n**Supabase** (Vector Store)\nPostgreSQL + pgvector extension. Provides SQL flexibility,\nnative upsert with conflict resolution, and RPC functions\nfor cosine similarity search.\n\n\n**Telegram** (instead of Google Chat/Email)\nLightweight bot interface for both notifications and\nsemantic search commands.",
+        "height": 912,
+        "width": 2320,
+        "color": 5
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -1408,
+        -112
+      ],
+      "id": "ac57063e-a16a-4933-98e2-1a9212f82a60",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.message.text }}",
+                    "rightValue": "/search",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    },
+                    "id": "238c3aff-760e-4cf7-9b24-923d43592843"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "search "
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 3
+                },
+                "conditions": [
+                  {
+                    "id": "c791b181-7e02-4a0a-ab14-0e045128229f",
+                    "leftValue": "={{ $json.message.text }}",
+                    "rightValue": "/start",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "start"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.4,
+      "position": [
+        -496,
+        976
+      ],
+      "id": "eb84b4f4-cdf7-4062-9786-870638ad685c",
+      "name": "Switch1"
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $('Telegram: Receive Message').item.json.message.chat.id }}",
+        "text": "=👋 Hi! I help search tickets",
+        "additionalFields": {
+          "appendAttribution": false,
+          "parse_mode": "HTML"
+        }
+      },
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        -256,
+        1088
+      ],
+      "id": "226d79ba-7985-487d-b7aa-5df4b514d9b2",
+      "name": "Telegram: Send Results1",
+      "webhookId": "e224767a-d7f5-4cb6-981f-f6b914fe9879",
+      "credentials": {
+        "telegramApi": {
+          "id": "uBKPO989QhgvCWdT",
+          "name": "Telegram account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "GitHub: Issue Trigger": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Update Status → closed",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set: Prepare from Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set: Prepare from Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Set: Prepare from Webhook",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Supabase: Delete Issue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set: Prepare from Webhook": {
+      "main": [
+        [
+          {
+            "node": "Gemini: Get Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set: Prepare Fields": {
+      "main": [
+        [
+          {
+            "node": "Gemini: Get Embedding",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini: Get Embedding": {
+      "main": [
+        [
+          {
+            "node": "Supabase: Upsert Issue",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "▶️ Run Once": {
+      "main": [
+        [
+          {
+            "node": "GitHub: Get All Issues",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "GitHub: Get All Issues": {
+      "main": [
+        [
+          {
+            "node": "Set: Prepare Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: Update Status → closed": {
+      "main": [
+        [
+          {
+            "node": "Telegram: Send Notification1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Telegram: Receive Message": {
+      "main": [
+        [
+          {
+            "node": "Switch1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set: Extract Query": {
+      "main": [
+        [
+          {
+            "node": "Gemini: Embed Query",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Gemini: Embed Query": {
+      "main": [
+        [
+          {
+            "node": "Supabase: RPC search_issues",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Supabase: RPC search_issues": {
+      "main": [
+        [
+          {
+            "node": "Code: Format Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Format Results": {
+      "main": [
+        [
+          {
+            "node": "Telegram: Send Results",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch1": {
+      "main": [
+        [
+          {
+            "node": "Set: Extract Query",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Telegram: Send Results1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "75271f1d-ace8-430b-ac77-d2a0830d57a2",
+  "meta": {
+    "instanceId": "fd63c32f8019fb96d0f47e7be729816d9866dcb8bfd09da2c2c3a1a7c92a6d41"
+  },
+  "id": "g5hGFVXg308VSGh4",
+  "tags": []
+}
